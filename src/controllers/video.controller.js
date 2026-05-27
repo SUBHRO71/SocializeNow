@@ -157,7 +157,7 @@ const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
 
     if(req.user?._id){
-        await Video.findOneAndUpdate(videoId,{$inc:{views: 1}})
+        await Video.findByIdAndUpdate(videoId,{$inc:{views: 1}})
     }
 
     const getVideoWithDetails = await Video.aggregate([{
@@ -269,10 +269,19 @@ return res.status(200).json(new ApiResponse(200,getVideoWithDetails[0],"successf
 
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
-    const {title,description,thumbnail}= req.body
+    const {title,description}= req.body
     const userId = req.user?._id
 
-    if(title.trim()===""|| !title && thumbnail.trim()==="" ||!thumbnail && !description){
+    if(
+        (title !== undefined && title.trim() === "") ||
+        (description !== undefined && description.trim() === "")
+    ){
+        throw new ApiError(400,"Fields cannot be empty")
+    }
+
+    const thumbnailLocalPath = req.file?.path
+
+    if(!title && !description && !thumbnailLocalPath){
         throw new ApiError(400,"Required atleast one field to update")
     }
 
@@ -286,14 +295,30 @@ const updateVideo = asyncHandler(async (req, res) => {
         updateData.description = description.trim()
     }
 
-    if(thumbnail){
-        updateData.thumbnail = thumbnail.trim()
+    if(thumbnailLocalPath){
+        const thumbnailFile = await uploadOnCloudinary(thumbnailLocalPath)
+
+        if(!thumbnailFile?.url || !thumbnailFile?.public_id){
+            throw new ApiError(500,"Thumbnail upload failed. Please try again")
+        }
+
+        updateData.thumbnail = {
+            url: thumbnailFile.url,
+            public_id: thumbnailFile.public_id
+        }
     }
 
-    const updateVideo = await Video.findOneAndUpdate({
-        _id:videoId,
-        owner:userId
-    },
+    const video = await Video.findOne({
+        _id: videoId,
+        owner: userId
+    })
+
+    if(!video){
+        throw new ApiError(404, "Video not found or you are not authorized to update this video")
+    }
+
+    const updatedVideo = await Video.findByIdAndUpdate(
+    videoId,
     {
         $set: updateData
     },
@@ -301,11 +326,11 @@ const updateVideo = asyncHandler(async (req, res) => {
         new:true
     })
 
-    if(!updateVideo){
-        throw new ApiError(404, "Video not found or you are not authorized to update this video")
-
+    if(thumbnailLocalPath && video.thumbnail?.public_id){
+        await deleteFromCloudinary(video.thumbnail.public_id, "image")
     }
-    return res.status(200).json(new ApiResponse(200,updateVideo,"Successfully updated video details"))
+
+    return res.status(200).json(new ApiResponse(200,updatedVideo,"Successfully updated video details"))
 
 })
 
@@ -320,6 +345,14 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
     if(!video){
         throw new ApiError(404, "Video not found or you are not authorized to delete this video")
+    }
+
+    if(video.videoFile?.public_id){
+        await deleteFromCloudinary(video.videoFile.public_id, "video")
+    }
+
+    if(video.thumbnail?.public_id){
+        await deleteFromCloudinary(video.thumbnail.public_id, "image")
     }
 
     return res.status(200).json(new ApiResponse(200,null,"Successfully deleted video"))
@@ -345,7 +378,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     }
     )
 
-    if(!video){
+    if(!toggleStatus){
         throw new ApiError(404, "Video not found or you are not authorized to update this video")
     }
 

@@ -189,7 +189,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             secure: true
         }
     
-        const {accessToken, newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
+        const {accessToken, refreshToken: newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
     
         return res
         .status(200)
@@ -246,14 +246,14 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
         throw new ApiError(400, "Any One feild(email or fullName) is required.")
     }
     //check for if new email that user is changing is present in another user's id.(duplicate email check) 
-    const existingemail = await User.findOne({email: email});
-    if(existingemail && existingemail._id.toString() !== req.user?._id.toString()){
-        throw new ApiError(409,"User with this email already exists.")
-    } 
-
-
     if(email){
-        const user = await User.findByIdAndUpdate(
+        const existingemail = await User.findOne({email: email});
+        if(existingemail && existingemail._id.toString() !== req.user?._id.toString()){
+            throw new ApiError(409,"User with this email already exists.")
+        } 
+    }
+
+    const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
@@ -266,7 +266,6 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
     ).select("-password")
     if(!user){
         throw new ApiError(400,"Not authorized to update the details.")
-    }
     }
     
 
