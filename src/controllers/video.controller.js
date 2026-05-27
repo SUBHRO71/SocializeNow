@@ -30,7 +30,9 @@ const getAllVideos = asyncHandler(async (req, res) => {
             throw new ApiError(400,"Invalid User 1")
         }
         defaultCriteria.owner = new mongoose.Types.ObjectId(userId) //to scale down the total videos to only the one's uploaded by that specific user
-        defaultCriteria.isPublished = false //to fetch all videos including unpublished ones incase the owner wants to see their draft videos
+        if(userId === req.user?._id.toString()){
+            delete defaultCriteria.isPublished //owner can see published and unpublished videos
+        }
     }
 
     //push the completed criteria as the first stage 
@@ -96,7 +98,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError(400,"Please login and try again")
     }
 
-    if( [title,description].some((field)=>field.trim()=== "")){
+    if( [title,description].some((field)=>!field?.trim())){
         throw new ApiError(400,"All feilds are required.")
     }
 
@@ -295,6 +297,15 @@ const updateVideo = asyncHandler(async (req, res) => {
         updateData.description = description.trim()
     }
 
+    const video = await Video.findOne({
+        _id: videoId,
+        owner: userId
+    })
+
+    if(!video){
+        throw new ApiError(404, "Video not found or you are not authorized to update this video")
+    }
+
     if(thumbnailLocalPath){
         const thumbnailFile = await uploadOnCloudinary(thumbnailLocalPath)
 
@@ -306,15 +317,6 @@ const updateVideo = asyncHandler(async (req, res) => {
             url: thumbnailFile.url,
             public_id: thumbnailFile.public_id
         }
-    }
-
-    const video = await Video.findOne({
-        _id: videoId,
-        owner: userId
-    })
-
-    if(!video){
-        throw new ApiError(404, "Video not found or you are not authorized to update this video")
     }
 
     const updatedVideo = await Video.findByIdAndUpdate(

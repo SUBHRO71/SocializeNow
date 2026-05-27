@@ -107,7 +107,7 @@ const addComment = asyncHandler(async (req, res) => {
     const { videoId }= req.params;
     const { content } = req.body;
 
-    if(content.trim()==""){
+    if(!content || content.trim()===""){
         throw new ApiError("400", "Comment cannot be empty");
     }
 
@@ -136,20 +136,20 @@ const addComment = asyncHandler(async (req, res) => {
 })
 
 const updateComment = asyncHandler(async (req, res) => {
-    const {commentId, videoId} = req.params;
+    const {commentId} = req.params;
     const {newContent} = req.body;
 
     if(!mongoose.isValidObjectId(commentId) || !commentId){ // this commentId check is redudant as, if the comment doesn't exist, the endpoint won't be hit at all 
         throw new ApiError(400, "Invalid comment id")
     }
 
+    if(!newContent || newContent.trim() === ""){
+        throw new ApiError(400, "Comment content cannot be empty")
+    }
+
     const comment = await Comment.findById(commentId)
     if(!comment){
         throw new ApiError(404,"Comment dosen't exists.")
-    }
-
-    if(!(await Video.findById(videoId) ) ){
-        throw new ApiError(404,"Video dosen't exists, Sorry")
     }
 
     //we also need to check if the comment being updated was writtend by the same user or not- else any user can update any comment
@@ -160,7 +160,7 @@ const updateComment = asyncHandler(async (req, res) => {
     //don't need to check if user exists or not ;as it is done by the middleware
 
     const Updatedcomment = await Comment.findByIdAndUpdate(commentId, {
-        content: newContent
+        content: newContent.trim()
     },{new :true})
 
     if(!Updatedcomment){

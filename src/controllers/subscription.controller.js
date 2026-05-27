@@ -17,6 +17,12 @@ const toggleSubscription = asyncHandler(async (req, res) => {
     if(channelId.toString()===subscriberId.toString()){
         throw new ApiError(400,"Can't self subscribe")
     }
+
+    const channelExists = await User.exists({_id: channelId})
+
+    if(!channelExists){
+        throw new ApiError(404,"Channel not found")
+    }
     //check if existing subscriber
     const isSubscribed = await Subscription.findOne({
     $and: [
@@ -52,6 +58,13 @@ const toggleSubscription = asyncHandler(async (req, res) => {
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     const {channelId} = req.params;
     const {page = 1,limit =10} = req.query;
+
+    const channelExists = await User.exists({_id: channelId})
+
+    if(!channelExists){
+        throw new ApiError(404,"Channel not found")
+    }
+
     const subscriberList = Subscription.aggregate([
     {
         $match:{
@@ -67,6 +80,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
             pipeline:[
                 {
                     $project:{
+                        fullName:1,
                         username:1,
                         email:1,
                         avatar:1
@@ -82,7 +96,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
             //flatening the output for a cleaner API response
             $project:{
                 _id:0, //too many id's that the frontend don't need, so we exclude it
-                channelId:"$userDetails._id",
+                subscriberId:"$userDetails._id",
                 fullName: "$userDetails.fullName",
                 username: "$userDetails.username",
                 avatar: "$userDetails.avatar",
@@ -111,6 +125,12 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
 const getSubscribedChannels = asyncHandler(async (req, res) => {
     const { subscriberId } = req.params
     const {limit =10,page =1} = req.query
+
+    const subscriberExists = await User.exists({_id: subscriberId})
+
+    if(!subscriberExists){
+        throw new ApiError(404,"User not found")
+    }
 
     const subscribedChannel = Subscription.aggregate([
         {
