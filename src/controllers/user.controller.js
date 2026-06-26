@@ -2,6 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js"
 import { User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import deleteFromCloudinary from "../utils/deleteFromCloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
@@ -82,7 +83,7 @@ const registerUser = asyncHandler( async (req, res) => {
     }
 
     return res.status(201).json(
-        new ApiResponse(200, createdUser, "User registered Successfully")
+        new ApiResponse(201, createdUser, "User registered Successfully")
     )
 
 } )
@@ -284,12 +285,14 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
         throw new ApiError(400, "Avatar file is missing")
     }
 
+    // Read old avatar URL before updating
+    const currentUser = await User.findById(req.user?._id).select("avatar")
+    const oldAvatarUrl = currentUser?.avatar
 
     const avatar = await uploadOnCloudinary(avatarLocalPath)
 
     if (!avatar?.url) {
         throw new ApiError(400, "Error while uploading on avatar")
-        
     }
 
     const user = await User.findByIdAndUpdate(
@@ -301,6 +304,12 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
         },
         {new: true}
     ).select("-password")
+
+    // Delete old avatar from Cloudinary after successful update
+    if (oldAvatarUrl) {
+        const publicId = oldAvatarUrl.split('/').pop().split('.')[0]
+        await deleteFromCloudinary(publicId, "image")
+    }
 
     return res
     .status(200)
@@ -316,13 +325,14 @@ const updateUserCoverImage = asyncHandler(async(req, res) => {
         throw new ApiError(400, "Cover image file is missing")
     }
 
-
+    // Read old cover image URL before updating
+    const currentUser = await User.findById(req.user?._id).select("coverImage")
+    const oldCoverImageUrl = currentUser?.coverImage
 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
     if (!coverImage?.url) {
         throw new ApiError(400, "Error while uploading on avatar")
-        
     }
 
     const user = await User.findByIdAndUpdate(
@@ -334,6 +344,12 @@ const updateUserCoverImage = asyncHandler(async(req, res) => {
         },
         {new: true}
     ).select("-password")
+
+    // Delete old cover image from Cloudinary after successful update
+    if (oldCoverImageUrl) {
+        const publicId = oldCoverImageUrl.split('/').pop().split('.')[0]
+        await deleteFromCloudinary(publicId, "image")
+    }
 
     return res
     .status(200)

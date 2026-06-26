@@ -39,6 +39,33 @@ const videoSchema = new Schema(
             type: Number,
             default: 0
         },
+        tags: {
+            type: [String],
+            default: [],
+            index: true,
+        },
+        category: {
+            type: String,
+            default: 'Uncategorized',
+        },
+        transcript: {
+            type: String,
+            default: '',
+        },
+        processingStatus: {
+            type: String,
+            enum: ['pending', 'processing', 'completed', 'failed'],
+            default: 'pending',
+        },
+        metadata: {
+            size: Number,
+            format: String,
+            bitrate: String,
+            resolution: String,
+            codec: String,
+            fps: Number,
+            audioCodec: String,
+        },
         isPublished: {
             type: Boolean,
             default: true
@@ -55,5 +82,11 @@ const videoSchema = new Schema(
 )
 
 videoSchema.plugin(mongooseAggregatePaginate)
+
+videoSchema.index({ owner: 1, createdAt: -1 });
+videoSchema.index({ title: 'text', description: 'text' });
+videoSchema.index({ isPublished: 1 });
+
+videoSchema.index({ processingStatus: 1 });
 
 export const Video = mongoose.model("Video", videoSchema)

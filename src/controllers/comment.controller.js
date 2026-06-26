@@ -23,6 +23,7 @@ const getVideoComments = asyncHandler(async (req, res) => {
         {
             $match: {
                 video: new mongoose.Types.ObjectId(videoId),
+                parentComment: null
             }
         },
         {
@@ -105,10 +106,10 @@ const getVideoComments = asyncHandler(async (req, res) => {
 const addComment = asyncHandler(async (req, res) => {
 
     const { videoId }= req.params;
-    const { content } = req.body;
+    const { content, parentComment } = req.body;
 
     if(!content || content.trim()===""){
-        throw new ApiError("400", "Comment cannot be empty");
+        throw new ApiError(400, "Comment cannot be empty");
     }
 
     if( !(await Video.findById(videoId))){
@@ -121,10 +122,18 @@ const addComment = asyncHandler(async (req, res) => {
         throw new ApiError(400,"User dosen't exist")
     }
 
+    if (parentComment) {
+        const parent = await Comment.findById(parentComment);
+        if (!parent || parent.video.toString() !== videoId) {
+            throw new ApiError(400, "Invalid parent comment");
+        }
+    }
+
     const comment = await Comment.create({
         content:content,
         video: videoId,
-        owner: req.user?._id
+        owner: req.user?._id,
+        parentComment: parentComment || null
     })
 
     if(!comment){
@@ -201,9 +210,61 @@ const deleteComment = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, null, "Comment deleted successfully"))
 })
 
+const getCommentReplies = asyncHandler(async (req, res) => {
+    const { commentId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    if (!mongoose.isValidObjectId(commentId)) {
+        throw new ApiError(400, "Invalid comment id");
+    }
+
+    const replies = Comment.aggregate([
+        {
+            $match: {
+                parentComment: new mongoose.Types.ObjectId(commentId)
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "ownerDetails",
+                pipeline: [
+                    {
+                        $project: {
+                            fullName: 1,
+                            username: 1,
+                            avatar: 1
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $addFields: {
+                ownerDetails: { $first: "$ownerDetails" }
+            }
+        },
+        {
+            $sort: { createdAt: 1 } // oldest first for replies
+        }
+    ]);
+
+    const options = {
+        page: parseInt(page) || 1,
+        limit: parseInt(limit) || 10,
+    };
+
+    const result = await Comment.aggregatePaginate(replies, options);
+    
+    return res.status(200).json(new ApiResponse(200, result, "Replies fetched successfully"));
+});
+
 export {
     getVideoComments,   
     addComment, 
     updateComment,
-    deleteComment
+    deleteComment,
+    getCommentReplies
     }

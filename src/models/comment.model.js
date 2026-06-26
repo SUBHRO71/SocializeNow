@@ -14,6 +14,11 @@ const commentSchema = new Schema(
         owner: {
             type: Schema.Types.ObjectId,
             ref: "User"
+        },
+        parentComment: {
+            type: Schema.Types.ObjectId,
+            ref: 'Comment',
+            default: null
         }
     },
     {
@@ -23,5 +28,8 @@ const commentSchema = new Schema(
 
 
 commentSchema.plugin(mongooseAggregatePaginate)
+
+commentSchema.index({ video: 1, createdAt: -1 });
+commentSchema.index({ parentComment: 1 });
 
 export const Comment = mongoose.model("Comment", commentSchema)

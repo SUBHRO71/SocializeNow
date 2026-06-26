@@ -1,6 +1,8 @@
 import mongoose, {isValidObjectId} from "mongoose"
 import {Video} from "../models/video.model.js"
 import {User} from "../models/user.model.js"
+import {Subscription} from "../models/subscription.model.js"
+import {videoProcessingQueue, notificationQueue} from "../queues/index.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
@@ -85,7 +87,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
     const paginatedVideos = await Video.aggregatePaginate(Video.aggregate(pipeline),options)
 
     if(!paginatedVideos){
-        throw new ApiResponse(500,"Couldn't fetch videos, Please try again.")
+        throw new ApiError(500,"Couldn't fetch videos, Please try again.")
     }
     
     return res.status(200).json(new ApiResponse(200,paginatedVideos,"Successfully fetched videos"))
@@ -140,6 +142,28 @@ const publishAVideo = asyncHandler(async (req, res) => {
         isPublished:true
     })
     //aint using (!uploadVideo) cause code wouldn't even reach it if the .create() failed, it would go straight to the asynchandler
+
+    // Queue video for background processing (metadata extraction)
+    await videoProcessingQueue.add('process-video', {
+        videoId: uploadVideo._id
+    });
+
+    // Notify subscribers
+    const subscribers = await Subscription.find({ channel: req.user?._id });
+    const notifications = subscribers.map(sub => ({
+        name: 'notify-subscriber',
+        data: {
+            type: 'video_published',
+            recipientId: sub.subscriber,
+            senderId: req.user?._id,
+            message: `uploaded a new video: ${uploadVideo.title}`,
+            referenceModel: 'Video',
+            referenceId: uploadVideo._id
+        }
+    }));
+    if (notifications.length > 0) {
+        await notificationQueue.addBulk(notifications);
+    }
 
     return res.status(201).json(new ApiResponse(201,uploadVideo,"Successfully uploaded video"))
 
@@ -235,7 +259,7 @@ const getVideoById = asyncHandler(async (req, res) => {
                     $addFields:{
                         subscriberCount:{ $size : "$subscribers"},
                         isSubscribed:{ $cond:{
-                            if:{$in: [new mongoose.Types.ObjectId(req.user._id),"$subscribers.subscriber"]},
+                            if:{$in: [req.user?._id ? new mongoose.Types.ObjectId(req.user._id) : null,"$subscribers.subscriber"]},
                             then:true,
                             else:false
                         }}
