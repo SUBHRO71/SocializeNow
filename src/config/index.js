@@ -3,7 +3,7 @@ dotenv.config();
 
 const config = {
   port: parseInt(process.env.PORT, 10) || 8000,
-  mongodbUri: process.env.MONGODB_URI || process.env.MONGO_DB_URI,
+  postgresUri: process.env.POSTGRES_URI || process.env.DATABASE_URI,
   corsOrigin: process.env.CORS_ORIGIN || '*',
   accessTokenSecret: process.env.ACCESS_TOKEN_SECRET,
   accessTokenExpiry: process.env.ACCESS_TOKEN_EXPIRY || process.env.ACCESS_TOKEN_EXPIRATION || '1d',

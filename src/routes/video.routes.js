@@ -4,7 +4,7 @@ import {
     getAllVideos,
     getVideoById,
     publishAVideo,
-    togglePublishStatus,
+    toggleVideoVisibility,
     updateVideo,
 } from "../controllers/video.controller.js"
 import {verifyJWT} from "../middlewares/auth.middleware.js"
@@ -196,7 +196,7 @@ router
  *         required: true
  *         schema:
  *           type: string
- *         description: MongoDB ObjectId of the video
+ *         description: UUID of the video
  *     responses:
  *       200:
  *         description: Video fetched successfully
@@ -240,7 +240,7 @@ router
  *         required: true
  *         schema:
  *           type: string
- *         description: MongoDB ObjectId of the video
+ *         description: UUID of the video
  *     responses:
  *       200:
  *         description: Video deleted successfully
@@ -285,7 +285,7 @@ router
  *         required: true
  *         schema:
  *           type: string
- *         description: MongoDB ObjectId of the video
+ *         description: UUID of the video
  *     requestBody:
  *       content:
  *         multipart/form-data:
@@ -347,10 +347,10 @@ router
 
 /**
  * @swagger
- * /videos/toggle/publish/{videoId}:
+ * /videos/toggle/visibility/{videoId}:
  *   patch:
- *     summary: Toggle video publish status
- *     description: Toggles the isPublished status of a video. Only the video owner can toggle it.
+ *     summary: Toggle video visibility
+ *     description: Updates the visibility status of a video (public, private, unlisted). Only the video owner can toggle it.
  *     tags: [Videos]
  *     security:
  *       - bearerAuth: []
@@ -361,16 +361,29 @@ router
  *         required: true
  *         schema:
  *           type: string
- *         description: MongoDB ObjectId of the video
+ *         description: UUID of the video
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - visibility
+ *             properties:
+ *               visibility:
+ *                 type: string
+ *                 enum: [public, private, unlisted]
+ *                 description: The new visibility status
  *     responses:
  *       200:
- *         description: Video publish status toggled successfully
+ *         description: Video visibility toggled successfully
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  *       400:
- *         description: Invalid video ID
+ *         description: Invalid video ID or visibility status
  *         content:
  *           application/json:
  *             schema:
@@ -388,6 +401,6 @@ router
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
-router.route("/toggle/publish/:videoId").patch(checkValidObjectId(["videoId"]), clearVideosCache, togglePublishStatus);
+router.route("/toggle/visibility/:videoId").patch(checkValidObjectId(["videoId"]), clearVideosCache, toggleVideoVisibility);
 
 export default router

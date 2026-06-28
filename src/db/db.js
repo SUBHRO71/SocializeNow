@@ -1,16 +1,24 @@
-import mongoose from "mongoose";
-import { DB_NAME } from "../constants.js";
-import config from "../config/index.js";
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pkg from 'pg';
+import config from '../config/index.js';
+import * as schema from './schema.js';
 
+const { Pool } = pkg;
+
+const pool = new Pool({
+  connectionString: config.postgresUri,
+});
+
+export const db = drizzle(pool, { schema });
 
 const connectDB = async () => {
     try {
-        const connectionInstance = await mongoose.connect(`${config.mongodbUri}/${DB_NAME}`)
-        console.log(`\n MongoDB connected !! DB HOST: ${connectionInstance.connection.host}`);
+        await pool.connect();
+        console.log(`\n PostgreSQL connected !!`);
     } catch (error) {
-        console.log("MONGODB connection FAILED ", error);
+        console.log("PostgreSQL connection FAILED ", error);
         process.exit(1)
     }
 }
 
-export default connectDB
+export default connectDB;

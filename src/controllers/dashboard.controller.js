@@ -1,111 +1,60 @@
-import mongoose, { get } from "mongoose"
-import {Video} from "../models/video.model.js"
-import {Subscription} from "../models/subscription.model.js"
-import {Like} from "../models/like.model.js"
-import {ApiError} from "../utils/ApiError.js"
-import {ApiResponse} from "../utils/ApiResponse.js"
-import {asyncHandler} from "../utils/asyncHandler.js"
-import { User } from "../models/user.model.js"
+import { db } from "../db/db.js";
+import { videos, designs } from "../db/schema.js";
+import { eq, sql } from "drizzle-orm";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const getChannelStats = asyncHandler(async (req, res) => {
-    const channelId = req.user?._id; //changed: we can simply get the userId by the verifyJWT middleware(that way we can't veiw other people's stats)
+    const userId = req.user.id;
 
-    const getTotalViews = await Video.aggregate([
-        {
-            $match:{ owner: new mongoose.Types.ObjectId(channelId) }
-        },
-        {
-           $group: {
-                _id: null,
-                totalViews: { $sum: "$views"}
-           }
+    const videoStatsResult = await db.select({
+        totalVideos: sql`count(*)`.mapWith(Number),
+        totalVideoViews: sql`sum(${videos.views})`.mapWith(Number),
+    })
+    .from(videos)
+    .where(eq(videos.ownerId, userId));
 
-        }
-    ]);
-    const totalViews = getTotalViews.length >0 ? getTotalViews[0].totalViews :0;
-    const totalSubscribers = await Subscription.countDocuments({ channel: channelId})
- 
+    const designStatsResult = await db.select({
+        totalDesigns: sql`count(*)`.mapWith(Number),
+        totalDesignViews: sql`sum(${designs.views})`.mapWith(Number),
+    })
+    .from(designs)
+    .where(eq(designs.ownerId, userId));
 
-    const totalVideos = await Video.countDocuments({ owner: channelId });
-
-    const getAllLikes = await Like.aggregate([
-        {
-            $lookup:{
-                from:"videos",
-                localField: "video",
-                foreignField: "_id",
-                as: "videoInfo"
-            }
-        },
-        {
-            $unwind: "$videoInfo"
-        },
-        {
-            $match: {
-                "videoInfo.owner":new mongoose.Types.ObjectId(channelId)
-            }
-        },
-        {
-            $count:"totalLikes"
-        }
-    ])
-
-    const totalLikes = getAllLikes.length >0 ? getAllLikes[0].totalLikes : 0;
+    const videoStats = videoStatsResult[0];
+    const designStats = designStatsResult[0];
 
     const stats = {
-        totalViews,
-        totalSubscribers,
-        totalVideos,
-        totalLikes
-    }
+        totalVideos: videoStats.totalVideos || 0,
+        totalVideoViews: videoStats.totalVideoViews || 0,
+        totalDesigns: designStats.totalDesigns || 0,
+        totalDesignViews: designStats.totalDesignViews || 0,
+    };
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, stats, "Channel stats fetched succesfully"))
-})
+        .status(200)
+        .json(new ApiResponse(200, stats, "Dashboard stats fetched successfully"));
+});
 
 const getChannelVideos = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const channelId = req.user?._id;
-    const {page = 1, limit = 10} = req.query
-
-    const getAllVideos=  Video.aggregate([
-        {
-            $match:{
-                "owner":new mongoose.Types.ObjectId(channelId)
-            }
-        },
-        {
-            $lookup: {
-                from: "users",
-                localField: "owner",
-                foreignField: "_id",
-                as: "ownerInfo"
-            }
-        },
-        {
-            $unwind: "$ownerInfo"
-        },
-        {
-            $sort:{ createdAt: -1 }
-        }
-    ])
-
-    //Applying pagination
-   
-
-    const options = {
-        page: parseInt(page),
-        limit: parseInt(limit),
-    }
-    const result = await Video.aggregatePaginate(getAllVideos,options);
+    const fetchedVideos = await db.select()
+        .from(videos)
+        .where(eq(videos.ownerId, userId))
+        .orderBy(sql`${videos.createdAt} DESC`)
+        .limit(parseInt(limit))
+        .offset(offset);
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, result, "Channel videos fetched successfully"))
-})
+        .status(200)
+        .json(new ApiResponse(200, fetchedVideos, "Dashboard videos fetched successfully"));
+});
 
 export {
-    getChannelStats, 
+    getChannelStats,
     getChannelVideos
-    }
+};

@@ -1,14 +1,18 @@
-import mongoose from "mongoose";
 import { ApiError } from "../utils/ApiError.js";
 
-const checkValidObjectId= (givenObjectId) => (req, _ , next) =>{
-    const isValid = givenObjectId.find(id => !mongoose.isValidObjectId(req.params[id]))
+const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const checkValidObjectId = (givenObjectIds) => (req, _ , next) => {
+    const invalidParam = givenObjectIds.find(id => {
+        const val = req.params[id];
+        return val && !uuidRegex.test(val);
+    });
     
-    if(isValid){
-        throw new ApiError(400, `Invalid ${isValid}`)
+    if (invalidParam) {
+        throw new ApiError(400, `Invalid UUID format for parameter: ${invalidParam}`);
     }
 
-    next()
-}
+    next();
+};
 
-export default checkValidObjectId
+export default checkValidObjectId;

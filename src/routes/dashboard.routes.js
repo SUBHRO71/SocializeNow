@@ -48,7 +48,7 @@ router.use(verifyJWT); // Apply verifyJWT middleware to all routes in this file
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
-router.route("/stats").get(cache((req) => `dashboard:stats:${req.user._id}`, 300), getChannelStats);
+router.route("/stats").get(cache((req) => `dashboard:stats:${req.user.id}`, 300), getChannelStats);
 
 /**
  * @swagger
@@ -81,6 +81,6 @@ router.route("/stats").get(cache((req) => `dashboard:stats:${req.user._id}`, 300
  *             schema:
  *               $ref: '#/components/schemas/ApiError'
  */
-router.route("/videos").get(cache((req) => `dashboard:videos:${req.user._id}`, 300), getChannelVideos);
+router.route("/videos").get(cache((req) => `dashboard:videos:${req.user.id}`, 300), getChannelVideos);
 
 export default router

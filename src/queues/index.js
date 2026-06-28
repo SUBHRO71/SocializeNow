@@ -21,20 +21,6 @@ const videoProcessingQueue = new Queue('video-processing', {
   },
 });
 
-// Notification queue - handles sending notifications for social events
-const notificationQueue = new Queue('notifications', {
-  connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 1000,
-    },
-    removeOnComplete: { count: 200 },
-    removeOnFail: { count: 100 },
-  },
-});
-
 console.log('📋 Job queues initialized');
 
-export { videoProcessingQueue, notificationQueue };
+export { videoProcessingQueue };
